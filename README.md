@@ -15,8 +15,7 @@ AI-powered mental wellness platform for Africa with culturally-aware AI and mult
 - **Deployment**: Vercel
 
 ## Live Demo
-- Frontend: https://serenica-frontend.vercel.app
-- Backend: https://serenica-backend.vercel.app
+- Frontend: https://serenica-frontend-bbvigq07j-wiskens-projects.vercel.app
+- Backend: https://serenica-backend-cq7uaj34g-wiskens-projects.vercel.app
 
-## Local Development
-[Add setup instructions]
+
