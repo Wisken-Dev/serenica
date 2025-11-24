@@ -8,9 +8,13 @@ dotenv.config();
 
 const app = express();
 
-// ✅ CORS configuration for both dev environments (Vite or CRA)
+// ✅ FIXED: CORS configuration with production URL
 const corsOptions = {
-  origin: ["http://localhost:5173", "http://localhost:3000"],
+  origin: [
+    "http://localhost:5173", 
+    "http://localhost:3000",
+    "https://serenica-frontend.vercel.app"  // Production URL
+  ],
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true,
 };
@@ -34,24 +38,30 @@ const connectDB = async () => {
 };
 connectDB();
 
-// ✅ Routes
+// ✅ Routes (ONCE - remove duplicate!)
 const authRoutes = require("./src/Routes/authRoutes");
 const aiRoutes = require("./src/Routes/aiRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/ai", aiRoutes);
-// Add this right after your routes in server.js
-app.use("/api/auth", (req, res, next) => {
-  console.log(`🔔 SERVER LEVEL - Auth route: ${req.method} ${req.originalUrl}`);
-  next();
-}, authRoutes);
+
+// ❌ REMOVE THIS DUPLICATE:
+// app.use("/api/auth", (req, res, next) => {
+//   console.log(`🔔 SERVER LEVEL - Auth route: ${req.method} ${req.originalUrl}`);
+//   next();
+// }, authRoutes);
 
 // ✅ Root route
 app.get("/", (req, res) => {
   res.send("Serenica Backend is running ✅");
 });
 
-// ✅ Error handler (optional but useful)
+// ✅ Health check route (add this)
+app.get("/api/health", (req, res) => {
+  res.json({ status: "OK", message: "Backend is healthy" });
+});
+
+// ✅ Error handler
 app.use((err, req, res, next) => {
   console.error("Server Error:", err.stack);
   res.status(500).json({ message: "Something went wrong on the server" });
