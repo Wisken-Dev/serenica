@@ -1,11 +1,57 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { signup } from "../api/auth";
 import { useNavigate, Link } from "react-router-dom";
+import axios from "axios";
 
 const Signup = ({ setUser, language, t }) => {
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  // ✅ Change "name" to "username" in the form state
+  const [form, setForm] = useState({ username: "", email: "", password: "" });
   const [isLoading, setIsLoading] = useState(false);
+  const [backendStatus, setBackendStatus] = useState("checking");
+  const [backendUrl, setBackendUrl] = useState("");
   const navigate = useNavigate();
+
+  // Determine backend URL based on environment
+  useEffect(() => {
+    const isDevelopment = import.meta.env.DEV || window.location.hostname === 'localhost';
+    const url = isDevelopment 
+      ? "http://localhost:5000" 
+      : "https://serenica-backend.vercel.app";
+    
+    setBackendUrl(url);
+    console.log(`🌐 Using backend: ${url}`);
+  }, []);
+
+  // Test backend connection
+  useEffect(() => {
+    if (!backendUrl) return;
+
+    axios
+      .get(`${backendUrl}/api/auth/test`)
+      .then((res) => {
+        console.log("Backend connected ✅", res.data);
+        setBackendStatus("connected");
+      })
+      .catch((err) => {
+        console.error("Backend connection failed ❌", err);
+        setBackendStatus("failed");
+        
+        // If production fails, try localhost as fallback (for development)
+        if (backendUrl.includes("vercel.app")) {
+          console.log("🔄 Trying localhost as fallback...");
+          axios.get("http://localhost:5000/api/auth/test")
+            .then((res) => {
+              console.log("Local backend connected ✅", res.data);
+              setBackendUrl("http://localhost:5000");
+              setBackendStatus("connected");
+            })
+            .catch(() => {
+              // Both failed, keep production URL but mark as failed
+              setBackendStatus("failed");
+            });
+        }
+      });
+  }, [backendUrl]);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -16,21 +62,26 @@ const Signup = ({ setUser, language, t }) => {
     setIsLoading(true);
     
     try {
-      const res = await signup(form);
+      // ✅ Send the form data directly - it now has "username" instead of "name"
+      const res = await signup(form, backendUrl);
 
       // ✅ Save user info correctly based on backend response
       const userData = {
-        id: res._id,
-        name: res.name,
-        email: res.email,
+        id: res.user?.id || res._id,
+        username: res.user?.username || form.username, // ✅ Use username
+        email: res.user?.email || form.email,
         token: res.token,
       };
+      
       setUser(userData);
 
-      // Optional: persist in localStorage
+      // Save token and user data to localStorage
+      if (res.token) {
+        localStorage.setItem("token", res.token);
+      }
       localStorage.setItem("user", JSON.stringify(userData));
 
-      // ✅ Redirect to dashboard instead of therapists
+      // ✅ Redirect to dashboard
       navigate("/dashboard");
       
     } catch (error) {
@@ -44,6 +95,50 @@ const Signup = ({ setUser, language, t }) => {
   return (
     <div className="page-container">
       <div className="therapy-card" style={{ maxWidth: "400px", margin: "2rem auto" }}>
+        {/* Backend Connection Status */}
+        {backendStatus === "checking" && (
+          <div style={{ 
+            textAlign: "center",
+            marginBottom: "var(--space-4)",
+            padding: "var(--space-3)",
+            backgroundColor: "var(--warning)", 
+            color: "white", 
+            borderRadius: "var(--radius)",
+            fontSize: "var(--text-sm)"
+          }}>
+            🔄 Checking Backend Connection...
+          </div>
+        )}
+        {backendStatus === "connected" && (
+          <div style={{ 
+            textAlign: "center",
+            marginBottom: "var(--space-4)",
+            padding: "var(--space-3)",
+            backgroundColor: "var(--therapy-secondary)", 
+            color: "white", 
+            borderRadius: "var(--radius)",
+            fontSize: "var(--text-sm)"
+          }}>
+            ✅ Backend Connected ({backendUrl.includes('localhost') ? 'Local' : 'Production'})
+          </div>
+        )}
+        {backendStatus === "failed" && (
+          <div style={{ 
+            textAlign: "center",
+            marginBottom: "var(--space-4)",
+            padding: "var(--space-3)",
+            backgroundColor: "var(--danger)", 
+            color: "white", 
+            borderRadius: "var(--radius)",
+            fontSize: "var(--text-sm)"
+          }}>
+            ❌ Backend Connection Failed
+            <div style={{ fontSize: "var(--text-xs)", opacity: 0.8, marginTop: "4px" }}>
+              {backendUrl}
+            </div>
+          </div>
+        )}
+
         <div style={{ textAlign: "center", marginBottom: "var(--space-6)" }}>
           <h2 style={{ 
             fontSize: "var(--text-2xl)", 
@@ -62,17 +157,18 @@ const Signup = ({ setUser, language, t }) => {
         </div>
         
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+          {/* ✅ Changed from "name" to "username" */}
           <div className="form-group">
-            <label className="form-label">Full Name</label>
+            <label className="form-label">Username</label>
             <input
-              name="name"
+              name="username"  {/* ✅ Changed from "name" to "username" */}
               type="text"
-              placeholder="Enter your full name"
+              placeholder="Choose a username"
               className="form-input"
-              value={form.name}
+              value={form.username}
               onChange={handleChange}
               required
-              disabled={isLoading}
+              disabled={isLoading || backendStatus === "failed"}
             />
           </div>
           
@@ -86,7 +182,7 @@ const Signup = ({ setUser, language, t }) => {
               value={form.email}
               onChange={handleChange}
               required
-              disabled={isLoading}
+              disabled={isLoading || backendStatus === "failed"}
             />
           </div>
           
@@ -100,7 +196,7 @@ const Signup = ({ setUser, language, t }) => {
               value={form.password}
               onChange={handleChange}
               required
-              disabled={isLoading}
+              disabled={isLoading || backendStatus === "failed"}
             />
           </div>
           
@@ -109,7 +205,7 @@ const Signup = ({ setUser, language, t }) => {
               type="submit"
               className="btn btn-therapy"
               style={{ width: "100%" }}
-              disabled={isLoading}
+              disabled={isLoading || backendStatus === "failed"}
             >
               {isLoading ? (
                 <>
@@ -140,6 +236,24 @@ const Signup = ({ setUser, language, t }) => {
             </Link>
           </p>
         </div>
+
+        {/* Debug info - remove in production */}
+        {import.meta.env.DEV && (
+          <div style={{ 
+            marginTop: "var(--space-4)", 
+            padding: "var(--space-3)", 
+            backgroundColor: "var(--gray-100)", 
+            borderRadius: "var(--radius)",
+            fontSize: "var(--text-xs)",
+            color: "var(--gray-600)"
+          }}>
+            <strong>Debug Info:</strong><br />
+            Backend URL: {backendUrl}<br />
+            Form Data: {JSON.stringify(form)}<br />
+            Environment: {import.meta.env.DEV ? 'Development' : 'Production'}<br />
+            Hostname: {window.location.hostname}
+          </div>
+        )}
       </div>
     </div>
   );
